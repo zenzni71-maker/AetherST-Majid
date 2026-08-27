@@ -177,7 +177,13 @@ class AetherVpnService : VpnService() {
             val attemptId = stateMutex.withLock {
                 if (commandCounter.get() != commandId) return@launch
                 val current = ConnectionController.status.value
-                if (current == ConnectionStatus.RUNNING || current == ConnectionStatus.VALIDATING) return@launch
+                // Skip if already running or connecting - avoid duplicate connection attempts
+                if (current == ConnectionStatus.RUNNING || 
+                    current == ConnectionStatus.VALIDATING || 
+                    current == ConnectionStatus.STARTING ||
+                    current == ConnectionStatus.SOCKS_READY ||
+                    current == ConnectionStatus.DATAPLANE_VALIDATED ||
+                    current == ConnectionStatus.RECONNECTING) return@launch
                 
                 val id = System.currentTimeMillis()
                 activeAttemptId.set(id)

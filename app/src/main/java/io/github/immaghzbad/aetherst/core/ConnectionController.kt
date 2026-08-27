@@ -308,22 +308,54 @@ class ConnectionController private constructor(context: Context) {
                     if (current == ConnectionStatus.RUNNING || current == ConnectionStatus.RECONNECTING) {
                         LogRepository.e("[Controller] Core reported error")
                         stopTimer()
-                        ConnectionStatus.ERROR
+                        // Auto-reconnect on error when not user-initiated stop
+                        scope.launch {
+                            delay(2000.milliseconds)
+                            if (_status.value == ConnectionStatus.ERROR) {
+                                LogRepository.i("[Controller] Auto-reconnecting after error...")
+                                start()
+                            }
+                        }
+                        ConnectionStatus.RECONNECTING
                     } else {
                         LogRepository.e("[Controller] Core error during $current")
-                        coreStatus
+                        // Auto-reconnect on startup error
+                        scope.launch {
+                            delay(2000.milliseconds)
+                            if (_status.value == ConnectionStatus.ERROR) {
+                                LogRepository.i("[Controller] Auto-reconnecting after startup error...")
+                                start()
+                            }
+                        }
+                        ConnectionStatus.RECONNECTING
                     }
                 }
                 ConnectionStatus.STOPPED -> {
                     if (current == ConnectionStatus.RUNNING || current == ConnectionStatus.RECONNECTING) {
                         LogRepository.w("[Controller] Core stopped unexpectedly")
                         stopTimer()
-                        ConnectionStatus.ERROR
+                        // Auto-reconnect when core stops unexpectedly
+                        scope.launch {
+                            delay(2000.milliseconds)
+                            if (_status.value == ConnectionStatus.ERROR || _status.value == ConnectionStatus.STOPPED) {
+                                LogRepository.i("[Controller] Auto-reconnecting after unexpected stop...")
+                                start()
+                            }
+                        }
+                        ConnectionStatus.RECONNECTING
                     } else if (current == ConnectionStatus.STOPPING) {
                         ConnectionStatus.STOPPED
                     } else if (current == ConnectionStatus.STARTING || current == ConnectionStatus.VALIDATING) {
                         LogRepository.w("[Controller] Core stopped during $current")
-                        coreStatus
+                        // Auto-reconnect on startup failure
+                        scope.launch {
+                            delay(2000.milliseconds)
+                            if (_status.value == ConnectionStatus.STOPPED || _status.value == ConnectionStatus.ERROR) {
+                                LogRepository.i("[Controller] Auto-reconnecting after startup failure...")
+                                start()
+                            }
+                        }
+                        ConnectionStatus.RECONNECTING
                     } else {
                         current
                     }
